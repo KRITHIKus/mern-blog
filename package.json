@@ -1,0 +1,18 @@
+{
+  "name": "mern-blog",
+  "version": "1.0.0",
+  "description": "MERN blog using react js and tailwind css",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+   "dev":"npx nodemon api/index.js",
+   "start":"node api/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.21.1",
+    "nodemon": "^3.1.7"
+  }
+}
