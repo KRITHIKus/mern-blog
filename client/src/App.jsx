@@ -7,11 +7,13 @@ import Projects from './pages/Projects'
 import SignUp from './pages/SignUp'
 import Dashboard from './pages/Dashboard'
 import Header from './components/Header'
+import  Footer  from './components/footer'
 
 export default function App() {
   return (
     <BrowserRouter>
       <Header/>
+      
     <Routes>
     
       <Route path='/' element={<Home/>}/>
@@ -23,7 +25,7 @@ export default function App() {
       
 
     </Routes>
-    
+    <Footer/>
     </BrowserRouter>
   )
 }
