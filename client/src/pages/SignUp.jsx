@@ -57,7 +57,7 @@ className='font-bold dark:text-white text-4xl'>
     Blog
     </Link>
   <p className=' text-sm mt-5'>
-    You can sign-in with your email and password or with Google
+    You can sign-up with your email and password or with Google
   </p>
 
 

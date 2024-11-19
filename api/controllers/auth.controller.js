@@ -29,8 +29,8 @@ res.json("signup Successfull")
 };
 
 export const signin= async (req, res, next)=>{
-  const {username, email, password}= req.body;
-  if(!username || !email || !password || username === '' || email ==='' || password === '') {
+  const { email, password}= req.body;
+  if( !email || !password || email ==='' || password === '') {
   return  next(errorHandler(400,'All fileds are required'))
   }
   try{
