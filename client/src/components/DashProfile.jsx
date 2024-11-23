@@ -2,7 +2,8 @@ import { Alert, Button, Modal, TextInput } from 'flowbite-react'
 import  { useEffect, useRef,useState } from 'react'
 import { useSelector } from 'react-redux'
 import { updateStart,updateSuccess,updateFailure,
-  deleteUserStart,deleteUserSuccess,deleteUserFailure
+  deleteUserStart,deleteUserSuccess,deleteUserFailure,
+  siginOutSuccess
 
  } from '../redux/user/userSlice'
 import  {useDispatch} from 'react-redux';
@@ -95,7 +96,25 @@ export default function () {
         
       }
     };
-    
+    const handleSignout = async ()=>{
+      try {
+        const res = await fetch('api/user/signout',{
+          method: 'POST',
+        });
+        const data = await res.json();
+
+        if(!res.ok){
+          console.log(data.message)
+        }else{
+          dispatch(siginOutSuccess());
+        }
+
+      } catch (error) {
+        console.log(error.message);
+        
+      }
+    }
+
   return (
     <div className='max-w-lg mx-auto p-3 w-full'>
         <h1 className='my-7 text-center font-semibold text-3xl'>
@@ -124,7 +143,7 @@ export default function () {
        </form>
 <div className='text-red-600 flex justify-between mt-5 mb-4'>
     <span onClick={()=>setshowModal(true)} className='cursor-pointer'>Delete Account</span>
-    <span className='cursor-pointer'>Sign Out</span>
+    <span onClick={handleSignout} className='cursor-pointer'>Sign Out</span>
 </div>
 {updateUserSuccess && (
     <Alert color='success' className='mt-5'>
