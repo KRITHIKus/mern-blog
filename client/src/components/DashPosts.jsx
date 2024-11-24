@@ -1,13 +1,17 @@
-import { Button, Table } from 'flowbite-react';
+import { Button, Table, Modal } from 'flowbite-react';
 import React, { useEffect, useState } from 'react'
 import {useSelector} from 'react-redux'
 import { Link } from 'react-router-dom';
+import {HiOutlineExclamationCircle} from 'react-icons/hi'
+
 
 export default function DashPosts() {   
   const {currentUser} = useSelector((state) => state.user)
-  const [userPosts,setuserPosts] = useState ([])
-  const [showmore,setshowmore] = useState(true)
-  console.log(userPosts);
+  const [userPosts,setuserPosts] = useState ([]);
+  const [showmore,setshowmore] = useState(true);
+  const [showModal,setshowModal] = useState(false);
+  const [postIdDelete,setPostIdToDelete]= useState('');
+
   
    useEffect(()=>{
       const fetchPosts = async () =>{
@@ -53,6 +57,27 @@ const handleShowmore = async ()=>
     console.log((error.message));
     
   }
+};
+
+const handleDeletePost = async ()=>{
+  setshowModal(false);
+  try {
+    const res = await fetch(`/api/post/deletepost/${postIdDelete}/${currentUser._id}`,{
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    if(!res.ok){
+      console.log(data.message);
+    }else{
+      setuserPosts((prev)=>
+      prev.filter((post)=> post._id !== postIdDelete)
+    );
+    }
+  } catch (error) {
+    console.log(error.message);
+    
+  }
+
 }
   return (
 <div className='table-auto overflow-x-scroll md:mx-auto p-3 scrollbar
@@ -92,7 +117,11 @@ const handleShowmore = async ()=>
         {posts.category}
       </Table.Cell>
       <Table.Cell>
-        <span className='font-medium text-red-500 hover:underline cursor-pointer'>
+        <span onClick={()=>{
+          setshowModal(true);
+          setPostIdToDelete(posts._id);
+
+        }} className='font-medium text-red-500 hover:underline cursor-pointer'>
           Delete
         </span>
       </Table.Cell>
@@ -117,6 +146,29 @@ const handleShowmore = async ()=>
 ): (
   <p>You have no posts yet</p>
 )}
+
+<Modal 
+show={showModal} onClose={()=>setshowModal(false)} popup
+ size='md'>
+<Modal.Header/>
+<Modal.Body>
+  <div className='text-center'>
+    <HiOutlineExclamationCircle className='h-14 w-14 text-gray-400 
+    dark:text-gray-200 mb-4 mx-auto' />
+    <h3 className='mb-5 text-lg text-gray-500 dark:text-gray-400'>Are you sure you want to delete this post? </h3>
+  </div>
+<div className='flex justify-center gap-5'>
+  <Button color='failure' onClick={ handleDeletePost}>Yes, I'm sure</Button>
+  <Button color='gray' onClick={()=> setshowModal(false)}>No, Cancel</Button>
+
+
+</div>
+
+
+
+</Modal.Body>
+
+ </Modal>
 
 </div>
   )
