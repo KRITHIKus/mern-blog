@@ -1,4 +1,4 @@
-import { Table } from 'flowbite-react';
+import { Button, Table } from 'flowbite-react';
 import React, { useEffect, useState } from 'react'
 import {useSelector} from 'react-redux'
 import { Link } from 'react-router-dom';
@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 export default function DashPosts() {   
   const {currentUser} = useSelector((state) => state.user)
   const [userPosts,setuserPosts] = useState ([])
+  const [showmore,setshowmore] = useState(true)
   console.log(userPosts);
   
    useEffect(()=>{
@@ -16,6 +17,9 @@ export default function DashPosts() {
         const data = await res.json();
         if(res.ok){
           setuserPosts(data.posts)
+          if(data.posts.length > 9){
+            setshowmore(false);
+          }
         }
         console.log(data);
         
@@ -29,6 +33,27 @@ export default function DashPosts() {
       fetchPosts();
 }
 },[currentUser._id])
+
+const handleShowmore = async ()=>
+{
+  const startIndex = userPosts.length;
+  try {
+    const res = await fetch(`/api/post/getposts?userId=${currentUser._id}&startIndex=${startIndex}`)
+    const data = await res.json();
+    if(res.ok){
+      setuserPosts((prev) => [...prev, ...data.posts] );
+      if(data.posts.length < 9){
+        setshowmore(false)
+      }
+    }
+
+  
+
+  } catch (error) {
+    console.log((error.message));
+    
+  }
+}
   return (
 <div className='table-auto overflow-x-scroll md:mx-auto p-3 scrollbar
  scrollbar-track-slate-100 scrollbar-thumb-slate-300 dark:scrollbar-track-slate-700 
@@ -81,6 +106,13 @@ export default function DashPosts() {
 
 ))}
   </Table>
+  {
+    showmore && (
+      <button onClick={handleShowmore} className='w-full text-teal-500 self-center text-sm py-7'>
+        show more
+      </button>
+    )
+  }
   </>
 ): (
   <p>You have no posts yet</p>
