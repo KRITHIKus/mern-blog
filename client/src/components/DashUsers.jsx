@@ -60,23 +60,22 @@ const handleShowmore = async ()=>
 };
 
 const handleDeleteUser = async ()=>{
-//   setshowModal(false);
-//   try {
-//     const res = await fetch(`/api/user/deleteuser/${usIdDelete}/${currentUser._id}`,{
-//       method: 'DELETE'
-//     });
-//     const data = await res.json();
-//     if(!res.ok){
-//       console.log(data.message);
-//     }else{
-//       setuserPosts((prev)=>
-//       prev.filter((post)=> post._id !== postIdDelete)
-//     );
-//     }
-//   } catch (error) {
-//     console.log(error.message);
+  setshowModal(false);
+  try {
+    const res = await fetch(`/api/user/delete/${userIdDelete}`,{
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    if(res.ok){
+    setuser((prev) => prev.filter((user)=> user._id !== userIdDelete))
+    setshowModal(false)
+    }else{
+      console.log(data.message)
+    }
+  } catch (error) {
+    console.log(error.message);
     
-//   }
+  }
 
 }
   return (
