@@ -29,6 +29,7 @@ export default function Header() {
       console.log(error.message);
       
     }
+    
   }
 
   return (
