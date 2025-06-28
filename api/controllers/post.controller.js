@@ -94,7 +94,7 @@ export const updatepost = async (req, res, next)=>{
             req.params.postId,
             {
                 $set: {
-                    tite: req.body.title,
+                    title: req.body.title,
                     content: req.body.content,
                     category: req.body.category,
                     image: req.body.image,
