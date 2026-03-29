@@ -37,6 +37,7 @@ export default function App() {
       <Route element={<OnlyAdminPrivateRoute/>}>
       <Route path='/createPost' element={<CreatePost/>}/>
       <Route path='/update-post/:postId' element={<UpdatePost/>}/>
+    
       </Route>
      
     </Routes>

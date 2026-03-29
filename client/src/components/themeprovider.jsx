@@ -1,16 +1,13 @@
-
 import { useSelector } from 'react-redux'
+import { useEffect } from 'react'
 
-export default function Themeprovider({children}) {
-    const {theme}= useSelector(state => state.theme)
-  return (
-    <div className={theme}>
-       <div className="bg-white text-gray-700 dark:text-gray-200 dark:bg-[rgb(16,23,42)] min-h-screen">
+export default function ThemeProvider({ children }) {
+  const { theme } = useSelector(state => state.theme)
 
-         {children}
-       </div>
-       
+  // Apply data-theme to <html> so CSS variables resolve correctly
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [theme])
 
-    </div>
-    )
+  return <>{children}</>
 }
