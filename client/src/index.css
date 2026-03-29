@@ -352,3 +352,25 @@ body {
 .text-faint   { color: var(--text-faint); }
 .text-green   { color: var(--green); }
 .text-red     { color: var(--red); }  
+
+/* ── POST CONTENT STYLING ── */
+
+.post-content ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin: 1rem 0;
+}
+
+.post-content ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin: 1rem 0;
+}
+
+.post-content li {
+  margin: 0.4rem 0;
+}
+
+.post-content p {
+  margin: 0.8rem 0;
+}
