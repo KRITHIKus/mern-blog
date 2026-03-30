@@ -374,3 +374,20 @@ body {
 .post-content p {
   margin: 0.8rem 0;
 }
+
+.post-content a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-word;
+}
+
+.post-content a:hover {
+  opacity: 0.85;
+}
+
+.post-content mark {
+  padding: 2px 4px;
+  border-radius: 3px;
+  color: inherit;
+}

@@ -134,11 +134,26 @@ export default function CreatePost() {
               onBlur={e => e.target.style.borderColor = 'var(--border)'}
               onChange={e => setFormData({ ...formData, category: e.target.value })}
             >
-              <option value="uncategorized">Uncategorized</option>
-              <option value="javascript">JavaScript</option>
-              <option value="reactjs">React JS</option>
-              <option value="nextjs">Next JS</option>
-            </select>
+            <option value="uncategorized">Uncategorized</option>
+
+<option value="software">Software Engineering</option>
+<option value="javascript">JavaScript</option>
+<option value="reactjs">React</option>
+<option value="backend">Backend / APIs</option>
+<option value="system-design">System Design</option>
+
+<option value="ai-ml">AI & Machine Learning</option>
+<option value="devops">DevOps & Cloud</option>
+
+<option value="tech">Technology</option>
+<option value="hardware">Hardware</option>
+<option value="space-tech">Space Tech</option>
+
+<option value="philosophy">Tech Philosophy</option>
+<option value="history">Tech History</option>
+
+<option value="career">Career & Learning</option>
+<option value="projects">Projects & Builds</option> </select>
           </div>
         </div>
 

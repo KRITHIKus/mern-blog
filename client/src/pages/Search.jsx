@@ -326,11 +326,26 @@ export default function Search() {
                 value={sidebarData.category}
                 onChange={handleChange}
               >
-                <option value="uncategorized">All</option>
-                <option value="reactjs">React.js</option>
-                <option value="nextjs">Next.js</option>
-                <option value="javascript">JavaScript</option>
-              </select>
+               <option value="uncategorized">Uncategorized</option>
+
+<option value="software">Software Engineering</option>
+<option value="javascript">JavaScript</option>
+<option value="reactjs">React</option>
+<option value="backend">Backend / APIs</option>
+<option value="system-design">System Design</option>
+
+<option value="ai-ml">AI & Machine Learning</option>
+<option value="devops">DevOps & Cloud</option>
+
+<option value="tech">Technology</option>
+<option value="hardware">Hardware</option>
+<option value="space-tech">Space Tech</option>
+
+<option value="philosophy">Tech Philosophy</option>
+<option value="history">Tech History</option>
+
+<option value="career">Career & Learning</option>
+<option value="projects">Projects & Builds</option></select>
             </div>
 
             <button type="submit" className="sf-apply">

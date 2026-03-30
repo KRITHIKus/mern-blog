@@ -41,7 +41,7 @@ export default function DashSidebar() {
 
   const handleSignout = async () => {
     try {
-      const res  = await fetch('/api/user/signout', { method: 'POST' }) // ✅ fixed path
+      const res  = await fetch('/api/user/sign-out', { method: 'POST' }) // ✅ fixed path
       const data = await res.json()
       if (!res.ok) { console.log(data.message) }
       else { dispatch(siginOutSuccess()) }
