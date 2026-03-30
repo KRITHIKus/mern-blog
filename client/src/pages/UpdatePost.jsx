@@ -107,7 +107,7 @@ export default function UpdatePost() {
       const data = await res.json();
       if (!res.ok) { setPublishError(data.message); return; }
       setPublishError(null);
-      navigate(`/post/${data.slug}`);
+      navigate(`/dashboard/post/${data.slug}`);
     } catch {
       setPublishError('Something went wrong');
     }
