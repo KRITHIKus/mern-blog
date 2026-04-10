@@ -3,15 +3,23 @@ import mongoose from "mongoose";
 const commentSchema = new mongoose.Schema({
     content:{
        type: String,
-        required : true,
+       required: true,
+       trim: true,
     },
     postId: {
         type: String,
-        required : true,
+        required: true,
+        index: true,
     },
     userId: {
         type: String,
-        required : true,
+        required: true,
+    },
+    parentCommentId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Comment',
+        default: null,
+        index: true,
     },
     likes: {
        type: Array,
@@ -21,9 +29,12 @@ const commentSchema = new mongoose.Schema({
         type: Number,
         default: 0,
     },
-   
-}, {timestamps: true})
+    isDeleted: {
+  type: Boolean,
+  default: false,
+},
+}, { timestamps: true });
 
-const Comment = mongoose.model('Comment',commentSchema)
+const Comment = mongoose.model('Comment', commentSchema);
 
 export default Comment;

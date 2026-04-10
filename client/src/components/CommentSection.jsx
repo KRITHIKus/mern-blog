@@ -39,38 +39,93 @@ export default function CommentSection({ postId }) {
       if (res.ok) {
         setComment('')
         setCommentError(null)
-        setComments(prev => [data, ...prev])
+        setComments(prev => [{ ...data, replies: [] }, ...prev])
       }
     } catch (e) { setCommentError(e.message) }
   }
 
-  const handleLike = async commentId => {
+  // ── reply to a parent comment ──────────────────────────────────────────────
+  const handleReply = async (parentCommentId, content) => {
     if (!currentUser) return navigate('/signin')
     try {
-      const res  = await fetch(`/api/comment/likeComment/${commentId}`, { method: 'PUT' })
+      const res  = await fetch('/api/comment/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content, postId, userId: currentUser._id, parentCommentId,
+        }),
+      })
       const data = await res.json()
       if (res.ok) {
         setComments(prev => prev.map(c =>
-          c._id === commentId
-            ? { ...c, likes: data.likes, numberOfLikes: data.likes.length }
+          c._id === parentCommentId
+            ? { ...c, replies: [...(c.replies || []), data] }
             : c
         ))
       }
     } catch (e) { console.log(e.message) }
   }
 
-  const handleEdit = (comment, editedContent) => {
-    setComments(prev =>
-      prev.map(c => c._id === comment._id ? { ...c, content: editedContent } : c)
-    )
+  // ── like: handles both top-level and replies ───────────────────────────────
+  const handleLike = async commentId => {
+    if (!currentUser) return navigate('/signin')
+    try {
+      const res  = await fetch(`/api/comment/likeComment/${commentId}`, { method: 'PUT' })
+      const data = await res.json()
+      if (res.ok) {
+        setComments(prev => prev.map(c => {
+          if (c._id === commentId)
+            return { ...c, likes: data.likes, numberOfLikes: data.likes.length }
+          if (c.replies?.some(r => r._id === commentId)) {
+            return {
+              ...c,
+              replies: c.replies.map(r =>
+                r._id === commentId
+                  ? { ...r, likes: data.likes, numberOfLikes: data.likes.length }
+                  : r
+              ),
+            }
+          }
+          return c
+        }))
+      }
+    } catch (e) { console.log(e.message) }
   }
 
+  // ── edit: handles both top-level and replies ───────────────────────────────
+  const handleEdit = (comment, editedContent) => {
+    setComments(prev => prev.map(c => {
+      if (c._id === comment._id) return { ...c, content: editedContent }
+      if (c.replies?.some(r => r._id === comment._id)) {
+        return {
+          ...c,
+          replies: c.replies.map(r =>
+            r._id === comment._id ? { ...r, content: editedContent } : r
+          ),
+        }
+      }
+      return c
+    }))
+  }
+
+  // ── delete: handles both top-level and replies ─────────────────────────────
   const handleDelete = async commentId => {
     setShowModal(false)
     if (!currentUser) return navigate('/signin')
     try {
       const res = await fetch(`/api/comment/deleteComment/${commentId}`, { method: 'DELETE' })
-      if (res.ok) setComments(prev => prev.filter(c => c._id !== commentId))
+      if (res.ok) {
+        setComments(prev => {
+          // top-level delete
+          if (prev.some(c => c._id === commentId))
+            return prev.filter(c => c._id !== commentId)
+          // reply delete — filter from parent's replies
+          return prev.map(c => ({
+            ...c,
+            replies: (c.replies || []).filter(r => r._id !== commentId),
+          }))
+        })
+      }
     } catch (e) { console.log(e.message) }
   }
 
@@ -354,6 +409,7 @@ export default function CommentSection({ postId }) {
           comment={c}
           onLike={handleLike}
           onEdit={handleEdit}
+          onReply={handleReply}
           onDelete={commentId => {
             setShowModal(true)
             setToDelete(commentId)
