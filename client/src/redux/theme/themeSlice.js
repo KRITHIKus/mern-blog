@@ -1,7 +1,16 @@
 import {createSlice} from '@reduxjs/toolkit'
 
+// Used only when nothing is persisted yet; must match the pre-paint script in
+// index.html (saved choice → OS preference → dark).
+const getInitialTheme = () => {
+    if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: light)').matches) {
+        return 'light';
+    }
+    return 'dark';
+};
+
 const initialState={
-    theme: 'light',
+    theme: getInitialTheme(),
 };
 
 const themeSlice = createSlice({

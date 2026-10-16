@@ -1,411 +1,289 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import CallToAction from '../components/CallToAction'
-import CommentSection from '../components/CommentSection'
-import PostCard from '../components/PostCard'
+import { HiArrowLeft, HiOutlineCheck, HiOutlineLink, HiOutlineDocumentText } from 'react-icons/hi'
+import { Alert, Button, Container, EmptyState, SectionHeader, Skeleton } from '../components/ui'
+import PostCard from '../components/content/PostCard'
+import CommentSection from '../components/comments/CommentSection'
+import ReadingMap from '../components/reader/ReadingMap'
+import SaveButton from '../components/reader/SaveButton'
+import { recordReading } from '../utils/readingHistory'
+import Reveal from '../components/motion/Reveal'
+import { getCategoryLabel } from '../constants/categories'
+import { SITE } from '../constants/site'
+import { formatDate, imageUrl, prepareArticle, readingTime } from '../utils/content'
+import { fetchPosts } from '../utils/posts'
 
-// ── READING PROGRESS HOOK ─────────────────────────────────────
-function useReadingProgress() {
-  const [progress, setProgress] = useState(0)
+const DAY = 24 * 60 * 60 * 1000
+
+// Progress through the article body (not the whole page), and whether the
+// body is currently on screen (drives the compact Reading Map control).
+function useArticleProgress(ref, enabled) {
+  const [state, setState] = useState({ progress: 0, inArticle: false })
   useEffect(() => {
+    if (!enabled) return undefined
+    let frame = 0
     const update = () => {
-      const el  = document.documentElement
-      const top = el.scrollTop || document.body.scrollTop
-      const h   = el.scrollHeight - el.clientHeight
-      setProgress(h > 0 ? Math.min(100, (top / h) * 100) : 0)
+      frame = 0
+      const el = ref.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      const vh = window.innerHeight
+      const progress = Math.min(1, Math.max(0, (vh * 0.35 - rect.top) / Math.max(rect.height - vh * 0.35, 1)))
+      setState({ progress, inArticle: rect.top < vh * 0.6 && rect.bottom > vh * 0.4 })
     }
-    window.addEventListener('scroll', update, { passive: true })
-    return () => window.removeEventListener('scroll', update)
-  }, [])
-  return progress
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(update) }
+    update()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+    }
+  }, [ref, enabled])
+  return state
+}
+
+// Same category first, topped up with the latest posts — no invented relevance.
+function useRelatedPosts(post) {
+  const [related, setRelated] = useState({ posts: [], sameTopic: false })
+  useEffect(() => {
+    if (!post) return undefined
+    const controller = new AbortController()
+    const notCurrent = p => p._id !== post._id
+    ;(async () => {
+      try {
+        const { posts: sameCategory } = await fetchPosts({ category: post.category, limit: 4 }, { signal: controller.signal })
+        let picks = sameCategory.filter(notCurrent).slice(0, 3)
+        const sameTopic = picks.length === 3
+        if (picks.length < 3) {
+          const { posts: latest } = await fetchPosts({ limit: 6 }, { signal: controller.signal })
+          const seen = new Set(picks.map(p => p._id))
+          picks = [...picks, ...latest.filter(p => notCurrent(p) && !seen.has(p._id))].slice(0, 3)
+        }
+        setRelated({ posts: picks, sameTopic })
+      } catch {
+        // Related posts are optional; fail quietly.
+      }
+    })()
+    return () => controller.abort()
+  }, [post])
+  return related
+}
+
+function CopyLinkButton() {
+  const [copied, setCopied] = useState(false)
+  useEffect(() => {
+    if (!copied) return undefined
+    const id = setTimeout(() => setCopied(false), 2000)
+    return () => clearTimeout(id)
+  }, [copied])
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      setCopied(true)
+    } catch {
+      setCopied(false)
+    }
+  }
+
+  return (
+    <Button variant="secondary" size="sm" onClick={copy} data-copied={copied || undefined}>
+      {copied ? <HiOutlineCheck aria-hidden="true" /> : <HiOutlineLink aria-hidden="true" />}
+      <span aria-live="polite">{copied ? 'Link copied' : 'Copy link'}</span>
+    </Button>
+  )
+}
+
+function ArticleSkeleton() {
+  return (
+    <Container size="reading" className="article-skeleton" aria-busy="true">
+      <span className="ui-visually-hidden" role="status">Loading article</span>
+      <Skeleton variant="text" width="20%" />
+      <Skeleton height="2.75rem" width="95%" />
+      <Skeleton height="2.75rem" width="70%" />
+      <Skeleton variant="text" width="35%" />
+      <Skeleton height="clamp(200px, 40vw, 420px)" className="article-skeleton__cover" />
+      {[100, 96, 98, 90, 60].map((w, i) => <Skeleton key={i} variant="text" width={`${w}%`} />)}
+    </Container>
+  )
 }
 
 export default function PostPage() {
-  const { postSlug }               = useParams()
-  const [loading,      setLoading] = useState(true)
-  const [post,         setPost]    = useState(null)
-  const [error,        setError]   = useState(false)
-  const [recentPosts,  setRecent]  = useState(null)
-  const progress                   = useReadingProgress()
+  const { postSlug } = useParams()
+  const [post, setPost] = useState(null)
+  const [status, setStatus] = useState('loading') // loading | ready | notfound | error
 
-  // fetch post
   useEffect(() => {
-    const fetchPost = async () => {
-      try {
-        setLoading(true)
-        const res  = await fetch(`/api/post/getposts?slug=${postSlug}`)
-        const data = await res.json()
-        if (!res.ok) { setError(true); setLoading(false); return }
-        setPost(data.posts[0])
-        setLoading(false)
-        setError(false)
-      } catch {
-        setError(true)
-        setLoading(false)
-      }
-    }
-    fetchPost()
+    const controller = new AbortController()
+    setStatus('loading')
+    fetchPosts({ slug: postSlug }, { signal: controller.signal })
+      .then(({ posts }) => {
+        if (!posts[0]) return setStatus('notfound')
+        setPost(posts[0])
+        setStatus('ready')
+      })
+      .catch(error => { if (error.name !== 'AbortError') setStatus('error') })
+    return () => controller.abort()
   }, [postSlug])
 
-  // fetch recent posts
+  const article = useMemo(() => (post ? prepareArticle(post.content) : { html: '', headings: [] }), [post])
+  const proseRef = useRef(null)
+  const { progress, inArticle } = useArticleProgress(proseRef, status === 'ready')
+  const related = useRelatedPosts(status === 'ready' ? post : null)
+
   useEffect(() => {
-    const fetchRecent = async () => {
-      try {
-        const res  = await fetch('/api/post/getposts?limit=3')
-        const data = await res.json()
-        if (res.ok) setRecent(data.posts)
-      } catch {}
+    if (post?.title) document.title = `${post.title} — ${SITE.name}`
+    return () => { document.title = 'A2D blog' }
+  }, [post?.title])
+
+  // Device-local reading history: record at most every 3s, and on leave.
+  const lastWrite = useRef(0)
+  const latestProgress = useRef(0)
+  useEffect(() => {
+    if (status !== 'ready' || !post) return
+    latestProgress.current = Math.max(latestProgress.current, progress)
+    const now = Date.now()
+    if (now - lastWrite.current > 3000 || progress >= 0.98) {
+      lastWrite.current = now
+      recordReading(post, latestProgress.current)
     }
-    fetchRecent()
+  }, [progress, status, post])
+  useEffect(() => {
+    if (!post) return undefined
+    latestProgress.current = 0
+    lastWrite.current = 0
+    return () => recordReading(post, latestProgress.current)
   }, [post])
 
-  // loading spinner
-  if (loading) return (
-    <>
-      <style>{`
-        .post-loading {
-          display:flex;align-items:center;justify-content:center;
-          min-height:100vh;flex-direction:column;gap:16px;
-          background:var(--bg);
-        }
-        .post-spinner {
-          width:36px;height:36px;
-          border:2px solid var(--border);
-          border-top-color:var(--accent);
-          border-radius:50%;
-          animation:spin 0.7s linear infinite;
-        }
-        .post-loading-text {
-          font-family:'JetBrains Mono',monospace;font-size:10px;
-          letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);
-        }
-        @keyframes spin{to{transform:rotate(360deg)}}
-      `}</style>
-      <div className="post-loading">
-        <div className="post-spinner"/>
-        <span className="post-loading-text">Loading transmission...</span>
-      </div>
-    </>
-  )
+  // Copy buttons inside code blocks (markup added by prepareArticle).
+  const onProseClick = async event => {
+    const button = event.target.closest('[data-copy-code]')
+    if (!button) return
+    const code = button.closest('.code-block')?.querySelector('pre')?.innerText ?? ''
+    try {
+      await navigator.clipboard.writeText(code)
+      button.textContent = 'Copied'
+      button.dataset.copied = 'true'
+    } catch {
+      button.textContent = 'Copy failed'
+    }
+    setTimeout(() => { button.textContent = 'Copy'; delete button.dataset.copied }, 1800)
+  }
 
-  if (error || !post) return (
-    <div style={{
-      minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',
-      flexDirection:'column',gap:'12px',background:'var(--bg)',
-      fontFamily:'JetBrains Mono,monospace',
-    }}>
-      <div style={{fontFamily:'Orbitron,monospace',fontSize:'13px',color:'var(--accent)',opacity:0.5}}>// 404</div>
-      <div style={{fontSize:'11px',color:'var(--text-muted)',letterSpacing:'0.08em'}}>
-        POST NOT FOUND
-      </div>
-      <Link to="/" style={{
-        fontSize:'10px',color:'var(--accent)',textDecoration:'none',
-        letterSpacing:'0.1em',marginTop:'8px',
-      }}>← RETURN HOME</Link>
-    </div>
-  )
+  if (status === 'loading') return <ArticleSkeleton />
 
-  const readTime = Math.max(1, Math.ceil(post.content.length / 1000))
+  if (status === 'notfound' || status === 'error') {
+    return (
+      <Container size="reading" className="article-state">
+        {status === 'error' ? (
+          <Alert variant="danger" title="Couldn't load this article">
+            Check your connection and refresh the page.
+          </Alert>
+        ) : (
+          <EmptyState
+            icon={<HiOutlineDocumentText />}
+            title="Article not found"
+            description="It may have been moved or unpublished."
+            action={<Button as={Link} to="/search" variant="secondary">Browse all articles</Button>}
+            titleAs="h1"
+          />
+        )}
+      </Container>
+    )
+  }
+
+  const minutes = readingTime(post.content)
+  const updated = new Date(post.updatedAt) - new Date(post.createdAt) > DAY
+  // Reading Map for articles with real structure (≥2 sections, ≥3 headings).
+  const showMap = article.headings.filter(h => h.level === 2).length >= 2 && article.headings.length >= 3
+  const categoryHref = `/search?category=${encodeURIComponent(post.category)}`
 
   return (
-    <>
-      <style>{`
-        /* ── READING PROGRESS BAR ── */
-        .reading-progress {
-          position: fixed;
-          top: 0; left: 0; right: 0;
-          height: 3px;
-          background: var(--border);
-          z-index: 9999;
-        }
-        .reading-progress-fill {
-          height: 100%;
-          background: linear-gradient(90deg, var(--accent), var(--green));
-          box-shadow: 0 0 8px var(--accent-glow);
-          transition: width 0.08s linear;
-        }
-
-        /* ── HERO ── */
-        .post-hero {
-          position: relative;
-          width: 100%;
-          height: 480px;
-          overflow: hidden;
-        }
-        @media(max-width:600px){ .post-hero { height: 320px; } }
-
-        .post-hero-img {
-          width: 100%; height: 100%;
-          object-fit: cover; display: block;
-          filter: saturate(0.55) brightness(0.55);
-        }
-        .post-hero-overlay {
-          position: absolute; inset: 0;
-          background: linear-gradient(
-            to bottom,
-            rgba(7,7,9,0.12) 0%,
-            rgba(7,7,9,0.38) 40%,
-            rgba(7,7,9,0.90) 78%,
-            var(--bg) 100%
-          );
-        }
-        .post-hero-content {
-          position: absolute;
-          bottom: 0; left: 0; right: 0;
-          padding: 32px 32px 28px;
-          max-width: 920px;
-          margin: 0 auto;
-        }
-        @media(max-width:600px){
-          .post-hero-content { padding: 24px 20px 20px; }
-        }
-
-        /* category tag */
-        .post-cat-tag {
-          display: inline-flex; align-items: center; gap: 5px;
-          font-family: 'JetBrains Mono', monospace;
-          font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
-          color: var(--accent); margin-bottom: 12px;
-          background: var(--accent-dim);
-          border: 1px solid rgba(0,229,255,0.22);
-          padding: 4px 10px; border-radius: 2px;
-          text-decoration: none;
-          transition: background 0.15s, box-shadow 0.15s;
-        }
-        .post-cat-tag:hover {
-          background: var(--accent-hover);
-          box-shadow: 0 0 8px var(--accent-glow);
-        }
-        .post-cat-tag::before { content: '▸'; font-size: 8px; }
-
-        /* hero title — always on dark bg so hardcoded */
-        .post-hero-title {
-          font-family: 'Orbitron', monospace;
-          font-size: clamp(18px, 3vw, 34px);
-          font-weight: 900; line-height: 1.12;
-          color: #dddde8;
-          letter-spacing: -0.01em;
-          margin-bottom: 14px;
-          text-shadow: 0 2px 16px rgba(0,0,0,0.6);
-        }
-        .post-meta {
-          display: flex; align-items: center;
-          gap: 10px; flex-wrap: wrap;
-          font-family: 'JetBrains Mono', monospace;
-          font-size: 9px;
-          color: rgba(221,221,232,0.55);
-          letter-spacing: 0.06em;
-        }
-        .post-meta-sep {
-          width: 3px; height: 3px; border-radius: 50%;
-          background: rgba(255,255,255,0.25);
-        }
-        .post-meta-hl { color: #00e5ff; opacity: 0.9; }
-
-        /* ── CONTENT ZONE ── */
-        .post-content-zone {
-          max-width: 720px;
-          margin: 0 auto;
-          padding: 44px 24px 0;
-        }
-        @media(max-width:600px){
-          .post-content-zone { padding: 28px 16px 0; }
-        }
-
-        /* post-content styling handled by index.css .post-content class */
-
-        /* post footer */
-        .post-foot {
-          display: flex; align-items: center;
-          justify-content: space-between;
-          padding: 18px 0; margin: 32px 0 0;
-          border-top: 1px solid var(--border);
-          font-family: 'JetBrains Mono', monospace;
-          font-size: 9px; color: var(--text-muted);
-          flex-wrap: wrap; gap: 12px;
-        }
-        .post-share-btns { display: flex; gap: 8px; }
-        .post-share-btn {
-          background: var(--surface);
-          border: 1px solid var(--border);
-          color: var(--text-muted);
-          font-family: 'JetBrains Mono', monospace;
-          font-size: 9px; letter-spacing: 0.08em;
-          padding: 5px 12px; border-radius: 2px;
-          cursor: pointer; text-transform: uppercase;
-          transition: border-color 0.15s, color 0.15s;
-        }
-        .post-share-btn:hover {
-          border-color: var(--accent); color: var(--accent);
-        }
-
-        /* ── CTA ZONE ── */
-        .post-cta-zone {
-          max-width: 920px;
-          margin: 0 auto;
-          padding: 32px 24px 0;
-        }
-        @media(max-width:600px){
-          .post-cta-zone { padding: 24px 16px 0; }
-        }
-
-        /* ── COMMENT ZONE ── */
-        .post-comment-zone {
-          max-width: 920px;
-          margin: 0 auto;
-          padding: 0 24px 0;
-        }
-        @media(max-width:600px){
-          .post-comment-zone { padding: 0 16px; }
-        }
-
-        /* section divider */
-        .post-sec-div {
-          display: flex; align-items: center;
-          border-top: 1px solid var(--border);
-          border-bottom: 1px solid var(--border);
-          background: var(--surface);
-          margin: 32px 0 0;
-        }
-        .post-sec-div-lbl {
-          font-family: 'JetBrains Mono', monospace;
-          font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
-          color: var(--text-muted);
-          padding: 10px 20px; border-right: 1px solid var(--border);
-          display: flex; align-items: center; gap: 6px;
-        }
-        .post-sec-div-lbl::before {
-          content: '//'; color: var(--accent); opacity: 0.5;
-        }
-        .post-sec-div-r {
-          padding: 10px 20px;
-          font-family: 'JetBrains Mono', monospace;
-          font-size: 9px; color: var(--text-faint);
-          letter-spacing: 0.1em;
-          display: flex; align-items: center; gap: 8px;
-        }
-
-        /* ── RECENT ZONE ── */
-        .post-recent-zone {
-          max-width: 1100px;
-          margin: 0 auto;
-          padding: 40px 24px 52px;
-        }
-        .post-recent-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 1px;
-          background: var(--border);
-          border: 1px solid var(--border);
-          border-radius: 4px;
-          overflow: hidden;
-        }
-        .post-recent-grid .post-card {
-          border-radius: 0; border: none;
-        }
-        @media(max-width:900px){
-          .post-recent-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-        @media(max-width:560px){
-          .post-recent-grid { grid-template-columns: 1fr; }
-          .post-recent-zone { padding: 28px 16px 40px; }
-        }
-      `}</style>
-
-      {/* ── READING PROGRESS ── */}
-      <div className="reading-progress">
-        <div
-          className="reading-progress-fill"
-          style={{ width: `${progress}%` }}
-        />
+    <article className="article">
+      <div className="reading-progress" aria-hidden="true">
+        <span style={{ transform: `scaleX(${progress})` }} />
       </div>
 
-      {/* ── HERO ── */}
-      <div className="post-hero">
-        <img
-          src={post.image}
-          alt={post.title}
-          className="post-hero-img"
-        />
-        <div className="post-hero-overlay" />
-        <div className="post-hero-content">
-          <Link
-            to={`/search?category=${post.category}`}
-            className="post-cat-tag"
-          >
-            {post.category}
+      <header className="article-header">
+        <Container size="reading">
+          <Link to="/search" className="text-link article-header__back">
+            <HiArrowLeft aria-hidden="true" /> All articles
           </Link>
-          <h1 className="post-hero-title">{post.title}</h1>
-          <div className="post-meta">
-            <span>{new Date(post.createdAt).toLocaleDateString('en-US', {
-              year: 'numeric', month: 'short', day: 'numeric'
-            })}</span>
-            <span className="post-meta-sep" />
-            <span className="post-meta-hl">{readTime} min read</span>
-            <span className="post-meta-sep" />
-            <span>by Krithik</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ── POST CONTENT ── */}
-      <div className="post-content-zone">
-        <div
-          className="post-content"
-          dangerouslySetInnerHTML={{ __html: post.content }}
-        />
-
-        <div className="post-foot">
-          <span style={{
-            fontFamily:'JetBrains Mono,monospace',
-            fontSize:'9px',letterSpacing:'0.1em',color:'var(--text-muted)'
-          }}>
-            // end_of_transmission
-          </span>
-          <div className="post-share-btns">
-            <button
-              className="post-share-btn"
-              onClick={() => navigator.clipboard?.writeText(window.location.href)}
-            >
-              Copy Link
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── CALL TO ACTION ── */}
-      <div className="post-cta-zone">
-        <CallToAction />
-      </div>
-
-      {/* ── COMMENTS ── */}
-      <div className="post-comment-zone">
-        <div className="post-sec-div">
-          <div className="post-sec-div-lbl">transmissions</div>
-          <div className="post-sec-div-r">
-            <span className="live-badge">LIVE</span>
-            comments
-          </div>
-        </div>
-        <CommentSection postId={post._id} />
-      </div>
-
-      {/* ── RECENT POSTS ── */}
-      {recentPosts && recentPosts.length > 0 && (
-        <>
-          <div className="post-sec-div" style={{ maxWidth:'1100px', margin:'32px auto 0' }}>
-            <div className="post-sec-div-lbl">recent_articles</div>
-            <div className="post-sec-div-r">more from the blog</div>
-          </div>
-          <div className="post-recent-zone">
-            <div className="post-recent-grid">
-              {recentPosts.map(p => (
-                <PostCard key={p._id} post={p} />
-              ))}
+          <Link to={categoryHref} className="article-header__topic">{getCategoryLabel(post.category)}</Link>
+          <h1 className="article-header__title">{post.title}</h1>
+          <div className="article-byline">
+            <span className="article-byline__avatar" aria-hidden="true">{SITE.author[0]}</span>
+            <div className="article-byline__text">
+              <p className="article-byline__name">{SITE.author}</p>
+              <p className="article-byline__meta">
+                <time dateTime={post.createdAt}>{formatDate(post.createdAt, { month: 'long' })}</time>
+                <span aria-hidden="true"> · </span>
+                {minutes} min read
+                {updated && (
+                  <>
+                    <span aria-hidden="true"> · </span>
+                    Updated <time dateTime={post.updatedAt}>{formatDate(post.updatedAt)}</time>
+                  </>
+                )}
+              </p>
             </div>
+            <SaveButton postId={post._id} className="article-byline__save" />
           </div>
-        </>
+        </Container>
+      </header>
+
+      {post.image && (
+        <figure className="article-cover">
+          <img
+            src={imageUrl(post.image, 1600)}
+            srcSet={`${imageUrl(post.image, 960)} 960w, ${imageUrl(post.image, 1600)} 1600w`}
+            sizes="(min-width: 1024px) 960px, 100vw"
+            alt=""
+          />
+        </figure>
       )}
-    </>
+
+      <div className={showMap ? 'article-layout article-layout--map' : 'article-layout'}>
+        {showMap && (
+          <aside className="article-layout__map">
+            <ReadingMap headings={article.headings} progress={progress} inArticle={inArticle} />
+          </aside>
+        )}
+        <div className="article-layout__main">
+          <div ref={proseRef} className="prose" onClick={onProseClick} dangerouslySetInnerHTML={{ __html: article.html }} />
+
+          <footer className="article-footer">
+            <Link to={categoryHref} className="topic-chip">{getCategoryLabel(post.category)}</Link>
+            <div className="article-footer__actions">
+              <SaveButton postId={post._id} />
+              <CopyLinkButton />
+            </div>
+          </footer>
+        </div>
+      </div>
+
+      <section className="article-discussion" aria-labelledby="discussion-heading">
+        <Container size="reading">
+          <SectionHeader id="discussion-heading" title="Discussion" description="Questions, corrections and ideas are welcome." />
+          <CommentSection postId={post._id} />
+        </Container>
+      </section>
+
+      {related.posts.length > 0 && (
+        <Reveal as="section" className="article-related" aria-labelledby="related-heading">
+          <Container>
+            <SectionHeader
+              id="related-heading"
+              title={related.sameTopic ? `More in ${getCategoryLabel(post.category)}` : 'Keep reading'}
+            />
+            <div className="card-grid">
+              {related.posts.map((p, i) => <PostCard key={p._id} post={p} className="reveal-item" style={{ '--i': i }} />)}
+            </div>
+          </Container>
+        </Reveal>
+      )}
+    </article>
   )
 }

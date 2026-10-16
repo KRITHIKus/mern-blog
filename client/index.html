@@ -5,6 +5,27 @@
     <link rel="icon" type="img/png" href="/fav.png">
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>A2D blog</title>
+    <script>
+      // Pre-paint theme: persisted choice → OS preference → dark.
+      // Keep in sync with src/redux/theme/themeSlice.js.
+      (function () {
+        var theme;
+        try {
+          var saved = localStorage.getItem('persist:root');
+          if (saved) theme = JSON.parse(JSON.parse(saved).theme).theme;
+        } catch (e) {}
+        if (theme !== 'light' && theme !== 'dark') {
+          theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        }
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    />
   </head>
   <body>
     <div id="root"></div>

@@ -1,5 +1,6 @@
 import { errorHandler } from "../utils/error.js";
  import Comment from "../models/comment.model.js";
+import Post from "../models/post.model.js";
 
 export const createComment = async (req, res, next) => {
   try {
@@ -203,3 +204,24 @@ export const deleteComment = async (req, res, next) => {
       next(error);
     }
   };
+
+// Reader activity: the signed-in reader's own comments and the comments
+// they marked helpful, each with the post's title/slug for linking.
+export const getMyActivity = async (req, res, next) => {
+  try {
+    const [comments, appreciated] = await Promise.all([
+      Comment.find({ userId: req.user.id, isDeleted: { $ne: true } }).sort({ createdAt: -1 }).limit(20),
+      Comment.find({ likes: req.user.id, isDeleted: { $ne: true } }).sort({ updatedAt: -1 }).limit(20),
+    ]);
+    const postIds = [...new Set([...comments, ...appreciated].map(c => c.postId))];
+    const posts = await Post.find({ _id: { $in: postIds } }).select('title slug');
+    const byId = new Map(posts.map(p => [p._id.toString(), { title: p.title, slug: p.slug }]));
+    const withPost = c => ({ ...c._doc, post: byId.get(c.postId) || null });
+    res.status(200).json({
+      comments: comments.map(withPost),
+      appreciated: appreciated.map(withPost),
+    });
+  } catch (error) {
+    next(error);
+  }
+};

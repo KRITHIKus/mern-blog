@@ -1,0 +1,281 @@
+/* ─────────────────────────────────────────────────────────────
+   ARTICLE — the quietest surface. Serif display for the opening and
+   section heads, Inter for reading, generous measure and rhythm.
+   .prose styles the Tiptap HTML stored by the API.
+   ───────────────────────────────────────────────────────────── */
+
+.reading-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: calc(var(--z-header) + 1);
+  height: 2px;
+  pointer-events: none;
+}
+.reading-progress span {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+  transform-origin: left;
+  transform: scaleX(0);
+}
+
+/* ── Opening ── */
+.article-header { padding-block: clamp(2rem, 1.25rem + 3.5vw, 5rem) clamp(2rem, 1.5rem + 2vw, 3rem); }
+.article-header__back { display: flex; width: fit-content; margin-bottom: clamp(2rem, 1.5rem + 2vw, 3rem); color: var(--color-text-secondary); }
+.article-header__back:hover { color: var(--color-text-primary); }
+.article-header__back svg { transition: transform var(--duration-base) var(--ease-standard); }
+.article-header__back:hover svg { transform: translateX(-3px); }
+.article-header__topic {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+}
+.article-header__topic::before { content: ''; width: 0.55em; height: 0.55em; background: var(--color-accent-2); }
+.article-header__topic:hover { color: var(--color-accent); }
+.article-header__title {
+  font-family: var(--font-display);
+  font-size: clamp(2.75rem, 1.6rem + 4.6vw, 5.5rem);
+  font-weight: 400;
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.article-byline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: clamp(1.75rem, 1.25rem + 1.5vw, 2.5rem);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border);
+}
+.article-byline__avatar { width: 2.75rem; height: 2.75rem; font-size: 1.375rem; }
+.article-byline__name { font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+.article-byline__meta { color: var(--color-text-muted); font-size: var(--text-meta); }
+
+/* ── Cover ── */
+.article-cover {
+  max-width: calc(var(--container-media) + 2 * var(--gutter));
+  margin: 0 auto clamp(2.5rem, 1.5rem + 3.5vw, 4.5rem);
+  padding-inline: var(--gutter);
+}
+.article-cover img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-hover);
+}
+
+/* ── Layout: reading column (+ Reading Map on wide screens, see workspace.css) ── */
+.article-layout {
+  max-width: calc(var(--container-reading) + 2 * var(--gutter));
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+  padding-bottom: clamp(3rem, 2rem + 4vw, 5rem);
+}
+
+/* ═════════ PROSE ═════════ */
+.prose {
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-article);
+  line-height: 1.75;
+  overflow-wrap: break-word;
+}
+.prose > * { margin-block: 0 1.35em; }
+.prose > :last-child { margin-bottom: 0; }
+.prose p:empty { display: none; }
+
+/* Opening drop cap when the article starts with a paragraph */
+.prose > p:first-child::first-letter {
+  float: left;
+  margin: 0.06em 0.1em 0 0;
+  color: var(--color-accent);
+  font-family: var(--font-display);
+  font-size: 4.1em;
+  line-height: 0.82;
+}
+
+.prose h1,
+.prose h2 {
+  margin-top: 2em;
+  margin-bottom: 0.5em;
+  font-family: var(--font-display);
+  font-size: clamp(1.875rem, 1.55rem + 1.2vw, 2.5rem);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+.prose h3,
+.prose h4 {
+  margin-top: 1.8em;
+  margin-bottom: 0.45em;
+  font-family: var(--font-sans);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+.prose h3 { font-size: clamp(1.1875rem, 1.12rem + 0.3vw, 1.375rem); }
+.prose h4 { font-size: 1em; }
+.prose h1, .prose h2, .prose h3, .prose h4 { text-wrap: balance; scroll-margin-top: calc(var(--header-height) + var(--space-6)); }
+.prose > :first-child { margin-top: 0; }
+
+.prose a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: text-decoration-thickness var(--duration-fast) var(--ease-standard);
+}
+.prose a:hover { text-decoration-thickness: 2px; }
+.prose strong { font-weight: var(--weight-semibold); }
+
+.prose ul,
+.prose ol { padding-left: 1.4em; }
+.prose ul { list-style: disc; }
+.prose ol { list-style: decimal; }
+.prose li { margin-block: 0.45em; padding-left: 0.25em; }
+.prose li::marker { color: var(--color-accent-2); }
+.prose ol > li::marker { font-family: var(--font-mono); font-size: 0.85em; }
+.prose li > p { margin: 0; }
+.prose li > ul,
+.prose li > ol { margin-block: 0.45em 0; }
+
+/* Blockquote: a callout by default… */
+.prose blockquote {
+  margin-block: 2em;
+  padding: 1.1em 1.4em;
+  border-left: 3px solid var(--color-accent-2);
+  background: var(--color-surface);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+.prose blockquote > :first-child { margin-top: 0; }
+.prose blockquote > :last-child { margin-bottom: 0; }
+.prose blockquote p { margin-bottom: 0.75em; }
+/* …and a pull quote when it is a single paragraph */
+.prose blockquote:has(> p:only-child) {
+  padding: 0.25em 0 0.25em 1em;
+  border-left-width: 2px;
+  background: none;
+  border-radius: 0;
+  font-family: var(--font-display);
+  font-size: 1.55em;
+  font-style: italic;
+  line-height: 1.25;
+}
+
+.prose hr {
+  height: auto;
+  margin-block: 3em;
+  border: 0;
+  background: none;
+  text-align: center;
+}
+.prose hr::after { content: '§'; color: var(--color-text-muted); font-family: var(--font-display); font-size: 1.5em; }
+
+.prose code {
+  padding: 0.12em 0.38em;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-hover);
+  font-family: var(--font-mono);
+  font-size: 0.84em;
+}
+
+/* Code blocks: night panel in both themes, with a label + copy bar */
+.prose .code-block {
+  margin-block: 2em;
+  overflow: hidden;
+  border: 1px solid var(--color-code-border);
+  border-radius: var(--radius-md);
+  background: var(--color-code-bg);
+}
+.prose .code-block__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.prose .code-block__label { color: #8f8b83; font-family: var(--font-mono); font-size: var(--text-xs); }
+.prose .code-block__copy {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-code-text);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+.prose .code-block__copy:hover { background: rgba(255, 255, 255, 0.08); }
+.prose .code-block__copy[data-copied] { border-color: #ff7352; color: #ff7352; }
+.prose pre {
+  margin: 0;
+  padding: 1.15em 1.4em 1.3em;
+  overflow-x: auto;
+  background: none;
+  color: var(--color-code-text);
+  font-size: 0.875rem;
+  line-height: 1.7;
+  tab-size: 2;
+}
+.prose pre code { padding: 0; border: 0; background: none; color: inherit; font-size: inherit; }
+
+.prose mark { padding: 0.1em 0.25em; border-radius: 3px; color: inherit; }
+
+/* Inline media: centred, allowed to break out of the text column on wide screens */
+.prose img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 2.5em auto;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-hover);
+}
+@media (min-width: 1024px) {
+  .prose img {
+    max-width: min(var(--container-media), calc(100vw - 2 * var(--gutter)));
+    margin-left: 50%;
+    margin-right: 0;
+    transform: translateX(-50%);
+  }
+}
+.prose figure { margin-block: 2.5em; }
+.prose figure img { margin-block: 0; }
+.prose figcaption { margin-top: 0.75em; color: var(--color-text-muted); font-size: var(--text-meta); text-align: center; }
+
+.prose .prose-table { margin-block: 2em; overflow-x: auto; }
+.prose table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+.prose th,
+.prose td { padding: 0.6em 0.9em; border-bottom: 1px solid var(--color-border); text-align: left; vertical-align: top; }
+.prose th { font-weight: var(--weight-semibold); border-bottom: 1.5px solid var(--color-text-primary); }
+
+/* ── After the article ── */
+.article-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-top: clamp(2.5rem, 2rem + 2vw, 3.5rem);
+  padding-top: var(--space-6);
+  border-top: 1.5px solid var(--color-text-primary);
+}
+.article-discussion {
+  padding-block: clamp(3rem, 2rem + 4vw, 5rem);
+  background: var(--color-bg-subtle);
+  border-top: 1px solid var(--color-border);
+}
+.article-related { padding-block: clamp(3rem, 2rem + 4vw, 5rem) clamp(4rem, 3rem + 4vw, 6rem); }
+
+/* ── States ── */
+.article-skeleton { display: grid; gap: var(--space-4); padding-block: clamp(2rem, 1.25rem + 3.5vw, 4.5rem) var(--space-16); }
+.article-skeleton__cover { margin-block: var(--space-6); border-radius: var(--radius-md); }
+.article-state { padding-block: clamp(3rem, 2rem + 6vw, 7rem); }

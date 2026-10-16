@@ -1,0 +1,291 @@
+/* ─────────────────────────────────────────────────────────────
+   APPLICATION SHELL — AppShell, Header, mobile navigation, Footer
+   (src/components/shell/*). Token-only; mobile-first.
+     base  phones: brand · theme · menu button (drawer holds nav/search/account)
+     md    ≥768:   + inline primary nav, search icon, account control
+     lg    ≥1024:  search icon becomes an inline search field
+   ───────────────────────────────────────────────────────────── */
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+.shell-main { flex: 1; min-width: 0; }
+/* <main> receives programmatic focus on route change; no ring needed there. */
+.shell-main:focus { outline: none; }
+
+/* ── Skip link ── */
+.shell-skip-link {
+  position: fixed;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: var(--z-toast);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+  transform: translateY(-200%);
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+.shell-skip-link:focus { transform: none; }
+
+/* ═════════ HEADER ═════════ */
+.shell-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-header);
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+}
+@supports (backdrop-filter: blur(1px)) {
+  .shell-header {
+    background: var(--color-glass);
+    -webkit-backdrop-filter: saturate(150%) blur(16px);
+    backdrop-filter: saturate(150%) blur(16px);
+  }
+}
+.shell-header__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--header-height);
+}
+.shell-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+
+/* ── Brand: serif wordmark between mono brackets ── */
+.shell-brand {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  flex-shrink: 0;
+  padding: var(--space-1) 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  text-decoration: none;
+  line-height: 1;
+}
+.shell-brand__mark { font-family: var(--font-display); font-size: 1.625rem; letter-spacing: -0.01em; }
+.shell-brand__bracket { color: var(--color-accent-2); font-family: var(--font-mono); font-size: 1.125rem; font-weight: 500; }
+
+/* ── Primary nav (md+) ── */
+.shell-nav { display: none; }
+.shell-nav__list { display: flex; align-items: center; gap: var(--space-1); }
+.shell-nav__link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 2.25rem;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+  transition: color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+.shell-nav__link:hover { color: var(--color-text-primary); background: var(--color-surface-hover); }
+.shell-nav__link.is-active { color: var(--color-text-primary); }
+/* Active route: the accent-line identity, sitting on the header's bottom edge. */
+.shell-nav__link.is-active::after {
+  content: '';
+  /* accent rule on the header's bottom edge */
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: calc((var(--header-height) - 2.25rem) / -2);
+  height: 2px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+}
+
+/* ── Search ── */
+.shell-search { position: relative; display: flex; align-items: center; }
+.shell-search__icon {
+  position: absolute;
+  left: var(--space-3);
+  width: 1rem;
+  height: 1rem;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+.shell-search__input { padding-left: 2.25rem; }
+.shell-search__input::-webkit-search-cancel-button { cursor: pointer; }
+.shell-search--header { display: none; }
+.shell-search--header .shell-search__input {
+  width: 13rem;
+  height: 2.25rem;
+  font-size: var(--text-sm);
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+.shell-search-link { display: none; }
+
+/* ── Account ── */
+.shell-account { display: none; align-items: center; margin-left: var(--space-1); }
+.shell-avatar-btn {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  cursor: pointer;
+}
+.shell-avatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border-strong);
+  object-fit: cover;
+  background: var(--color-surface-hover);
+  transition: border-color var(--duration-fast) var(--ease-standard);
+}
+.shell-avatar--lg { width: 2.5rem; height: 2.5rem; }
+.shell-avatar-btn:hover .shell-avatar,
+.shell-avatar-btn[aria-expanded="true"] .shell-avatar { border-color: var(--color-accent); }
+
+.shell-identity { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.shell-identity__text { flex: 1; min-width: 0; }
+.shell-identity__name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+}
+.shell-identity__name .ui-badge { flex-shrink: 0; }
+.shell-identity__username,
+.shell-identity__email {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shell-identity__email { font-size: var(--text-xs); color: var(--color-text-muted); }
+/* keep the account menu a sensible width even for long names/emails */
+.shell-account .ui-menu { width: 18rem; }
+
+/* ── Breakpoints ── */
+@media (min-width: 768px) {
+  .shell-header__inner { gap: var(--space-6); }
+  .shell-nav { display: block; }
+  .shell-search-link { display: inline-flex; }
+  .shell-account { display: flex; }
+  .shell-menu-btn { display: none; }
+}
+@media (min-width: 1024px) {
+  .shell-search--header { display: flex; margin-right: var(--space-2); }
+  .shell-search-link { display: none; }
+}
+@media (min-width: 1280px) {
+  .shell-search--header .shell-search__input { width: 16rem; }
+}
+
+/* ═════════ MOBILE DRAWER CONTENT ═════════ */
+.shell-drawer__section { margin-top: var(--space-6); }
+.shell-drawer__heading { margin-bottom: var(--space-2); }
+.shell-drawer__list { display: flex; flex-direction: column; gap: 2px; }
+.shell-drawer__link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--touch-target);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+  transition: color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+.shell-drawer__link:hover { color: var(--color-text-primary); background: var(--color-surface-hover); }
+.shell-drawer__link.is-active { color: var(--color-text-primary); background: var(--color-accent-subtle); }
+.shell-drawer__link.is-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: var(--space-2);
+  bottom: var(--space-2);
+  width: 3px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+}
+.shell-drawer__icon { display: inline-flex; color: var(--color-text-muted); }
+.shell-drawer__icon svg { width: 1.25rem; height: 1.25rem; }
+.shell-drawer__identity {
+  padding: var(--space-3);
+  margin-bottom: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-subtle);
+}
+.shell-drawer__signout { margin-top: var(--space-4); }
+.shell-drawer__auth { display: grid; gap: var(--space-3); }
+
+/* ═════════ FOOTER ═════════ */
+.shell-footer {
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-subtle);
+}
+.shell-footer__inner {
+  display: grid;
+  gap: var(--space-8);
+  padding-block: var(--space-12) var(--space-10);
+}
+@media (min-width: 640px) {
+  .shell-footer__inner { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .shell-footer__about { grid-column: 1 / -1; }
+}
+@media (min-width: 1024px) {
+  .shell-footer__inner { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); }
+  .shell-footer__about { grid-column: auto; }
+}
+.shell-footer__signoff {
+  margin-top: var(--space-6);
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 1.5rem + 2vw, 3.25rem);
+  line-height: 1;
+  letter-spacing: -0.015em;
+}
+.shell-footer__signoff em { font-style: italic; color: var(--color-accent); }
+.shell-footer__tagline {
+  max-width: 36ch;
+  margin-top: var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+.shell-footer__heading { margin-bottom: var(--space-3); }
+.shell-footer__links { display: flex; flex-direction: column; gap: var(--space-1); }
+.shell-footer__link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2rem;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+.shell-footer__link:hover { color: var(--color-text-primary); }
+.shell-footer__icon { display: inline-flex; color: var(--color-text-muted); }
+.shell-footer__icon svg { width: 1rem; height: 1rem; }
+.shell-footer__bottom {
+  padding-block: var(--space-5);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}

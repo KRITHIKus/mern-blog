@@ -2,6 +2,7 @@ import User from '../models/user.model.js';
 import bcryptjs from 'bcryptjs';
 import { errorHandler } from '../utils/error.js';
 import jwt from 'jsonwebtoken';
+import { verifyFirebaseIdToken } from '../utils/verifyFirebaseToken.js';
 
 export const signup = async (req, res, next) =>{
 const {username, email, password}= req.body;
@@ -61,8 +62,13 @@ const {password: pass, ...rest} = validUser._doc;
 };
 
 export const google = async (req, res, next) =>{
-const  {email, name, googlePhotoUrl}= req.body
 try {
+   // Identity comes only from the verified Firebase ID token, never from
+   // client-supplied email/name fields.
+   const decoded = await verifyFirebaseIdToken(req.body.idToken)
+   const email = decoded.email
+   const name = decoded.name || email.split('@')[0]
+   const googlePhotoUrl = decoded.picture
    const user = await User.findOne({email})
    if(user){
     const token = jwt.sign ( {id: user._id, isAdmin: user.isAdmin},process.env.JWT_SEC);

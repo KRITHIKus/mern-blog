@@ -1,0 +1,98 @@
+/* ─────────────────────────────────────────────────────────────
+   MOTION — one language, three categories:
+   1. AMBIENT     the Three.js lattice (components/motion/HeroSculpture)
+   2. INTERACTION hover / press / focus feedback, 150–300ms
+   3. NARRATIVE   one-time entrances: hero type, scroll reveals
+   Stillness is the default. Entrances live under
+   prefers-reduced-motion: no-preference; hover-only effects under
+   (hover: hover) so touch devices stay light.
+   ───────────────────────────────────────────────────────────── */
+
+@keyframes motion-rise { from { opacity: 0; transform: translateY(0.4em); } to { opacity: 1; transform: none; } }
+@keyframes motion-fade-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes motion-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes motion-draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes motion-stop { 0% { opacity: 0; transform: scale(0.2); } 70% { transform: scale(1.25); } 100% { opacity: 1; transform: none; } }
+
+/* ═════════ 2. INTERACTION ═════════ */
+
+/* Brand: the brackets open around the wordmark */
+.shell-brand__bracket { display: inline-block; transition: transform var(--duration-base) var(--ease-standard); }
+.shell-brand__mark { display: inline-block; transition: color var(--duration-base) var(--ease-standard); }
+.shell-brand:hover .shell-brand__bracket--open,
+.shell-brand:focus-visible .shell-brand__bracket--open { transform: translateX(-4px); }
+.shell-brand:hover .shell-brand__bracket--close,
+.shell-brand:focus-visible .shell-brand__bracket--close { transform: translateX(4px); }
+.shell-brand:hover .shell-brand__mark,
+.shell-brand:focus-visible .shell-brand__mark { color: var(--color-accent); }
+.shell-brand:active .shell-brand__mark { transform: scale(0.97); }
+
+@media (hover: hover) {
+  /* Stories: image eases in, headline underline draws, CTA arrow nudges */
+  .pc:hover .pc__media img { transform: scale(1.04); }
+  .pc:hover .pc__link { background-size: 100% 1px; }
+  .pc--lead:hover .pc__cta svg { transform: translateX(4px); }
+  .pc--lead:hover .pc__body { box-shadow: var(--shadow-lg), 0 0 0 1px var(--color-border-strong); }
+
+  /* Index rows: title shifts toward its arrow */
+  .pc--index .pc__title { transition: transform var(--duration-slow) var(--ease-standard); }
+  .pc--index .pc__arrow { transition: transform var(--duration-base) var(--ease-standard), color var(--duration-base) var(--ease-standard); }
+  .pc--index:hover .pc__title { transform: translateX(6px); }
+  .pc--index:hover .pc__link { color: var(--color-accent); background-size: 0 1px; }
+  .pc--index:hover .pc__arrow { transform: translateX(4px); color: var(--color-accent); }
+
+  /* Numbered items: the numeral warms */
+  .pc--compact .pc__index { transition: transform var(--duration-base) var(--ease-standard); }
+  .pc--compact:hover .pc__index { transform: translateY(-2px); }
+
+  /* Workshop: hard-edged lift with an offset shadow */
+  .workshop-card:hover { transform: translate(-4px, -4px); box-shadow: 6px 6px 0 var(--color-accent-2); }
+  .workshop-card:hover .workshop-card__go svg { transform: translateX(4px); }
+
+  /* Closing archive link */
+  .archive-link:hover .archive-link__text svg { transform: translateX(0.12em) rotate(-8deg); }
+
+  /* Footer links: underline slides in */
+  .shell-footer__link { background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat; transition: color var(--duration-fast) var(--ease-standard), background-size var(--duration-base) var(--ease-standard); }
+  .shell-footer__link:hover { background-size: 100% 1px; }
+}
+.workshop-card:active { transform: translate(-1px, -1px); box-shadow: 2px 2px 0 var(--color-accent-2); }
+.topic-chip:active,
+.sort-toggle__item:active { transform: scale(0.97); }
+
+/* Header nav: the active rule draws in */
+@media (prefers-reduced-motion: no-preference) {
+  .shell-nav__link.is-active::after { animation: motion-draw 250ms var(--ease-out) both; transform-origin: left; }
+}
+
+/* Copy link (article footer) */
+@keyframes motion-pop { 0% { transform: scale(0.6); } 60% { transform: scale(1.15); } 100% { transform: none; } }
+@media (prefers-reduced-motion: no-preference) {
+  .article-footer .ui-btn[data-copied="true"] svg { animation: motion-pop 300ms var(--ease-out); color: var(--color-success); }
+}
+
+/* ═════════ 3. NARRATIVE ═════════ */
+
+/* Hero: lines rise in sequence; the full stop lands last; the lattice fades in */
+@media (prefers-reduced-motion: no-preference) {
+  .hero__dateline { animation: motion-fade 500ms var(--ease-out) 100ms both; }
+  .hero__line { animation: motion-rise 800ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .hero__line:nth-child(1) { animation-delay: 120ms; }
+  .hero__line:nth-child(2) { animation-delay: 220ms; }
+  .hero__line:nth-child(3) { animation-delay: 340ms; }
+  .hero__stop { display: inline-block; animation: motion-stop 450ms var(--ease-out) 1000ms both; }
+  .hero__foot { animation: motion-fade-up 600ms var(--ease-out) 600ms both; }
+  .hero__sculpture canvas { animation: motion-fade 1200ms var(--ease-out) both; }
+  .hero__caption { animation: motion-fade 600ms var(--ease-out) 1200ms both; }
+}
+
+/* Scroll reveals (components/motion/Reveal): once, only where they help hierarchy */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal:not(.is-visible),
+  .reveal:not(.is-visible) .reveal-item { opacity: 0; transform: translateY(18px); }
+  .reveal.is-visible,
+  .reveal.is-visible .reveal-item {
+    transition: opacity 600ms var(--ease-out), transform 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .reveal.is-visible .reveal-item { transition-delay: calc(var(--i, 0) * 60ms + 60ms); }
+}

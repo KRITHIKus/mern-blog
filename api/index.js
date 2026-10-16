@@ -11,7 +11,9 @@ import statsRouter from './routes/stats.routes.js'
 import path from 'path'
 import morgan from 'morgan'
 
+import dns from 'dns';
 
+dns.setServers(['8.8.8.8', '8.8.4.4']);
 
 mongoose.
 connect( process.env.MONGO)
@@ -26,7 +28,8 @@ const __dirname = path.resolve();
 
 const app= express()
 
-app.use(express.json())
+// Long-form articles (HTML from the editor) easily exceed the 100kb default.
+app.use(express.json({ limit: '2mb' }))
 app.use(morgan("dev"))
 app.use(cookieParser())
 

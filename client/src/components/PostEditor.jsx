@@ -1,415 +1,252 @@
-import { useEditor, EditorContent } from '@tiptap/react';
-import Highlight from '@tiptap/extension-highlight';
-import {TextStyle} from '@tiptap/extension-text-style';
-import Color from '@tiptap/extension-color';
-import StarterKit from '@tiptap/starter-kit';
-import Link from '@tiptap/extension-link'
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react'
+import { useEditor, useEditorState, EditorContent } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import Image from '@tiptap/extension-image'
+import Highlight from '@tiptap/extension-highlight'
+import { TextStyle } from '@tiptap/extension-text-style'
+import Color from '@tiptap/extension-color'
+import { Placeholder } from '@tiptap/extensions'
 import {
-  HiOutlineLink,
-  HiOutlineX,
-  HiOutlineAnnotation,
-  HiOutlineColorSwatch,
-} from 'react-icons/hi';
+  LuBold, LuItalic, LuStrikethrough, LuCode, LuHighlighter, LuList, LuListOrdered, LuQuote,
+  LuSquareCode, LuMinus, LuLink, LuImage, LuUndo2, LuRedo2, LuMoreHorizontal,
+} from 'react-icons/lu'
+import { Alert, Button, Field, Input, Menu, MenuItem, MenuSeparator, Modal, Spinner } from './ui'
 
+const MAX_IMAGE = 5 * 1024 * 1024
 
-const toolbarBtnStyle = (active) => ({
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  width: 28,
-  height: 28,
-  background: active ? 'var(--accent-dim)' : 'transparent',
-  border: active ? '1px solid var(--accent)' : '1px solid transparent',
-  borderRadius: 4,
-  color: active ? 'var(--accent)' : 'var(--text-muted)',
-  fontFamily: 'JetBrains Mono, monospace',
-  fontSize: 12,
-  fontWeight: 600,
-  cursor: 'pointer',
-  transition: 'background 0.15s, color 0.15s, border-color 0.15s',
-  flexShrink: 0,
-});
-
-function ToolbarButton({ onClick, active, title, children }) {
+function ToolButton({ label, active = false, disabled = false, onClick, children }) {
   return (
     <button
       type="button"
-      title={title}
-      onMouseDown={e => { e.preventDefault(); onClick(); }}
-      style={toolbarBtnStyle(active)}
-      onMouseEnter={e => {
-        if (!active) {
-          e.currentTarget.style.background = 'var(--surface3)';
-          e.currentTarget.style.color = 'var(--text)';
-        }
-      }}
-      onMouseLeave={e => {
-        if (!active) {
-          e.currentTarget.style.background = 'transparent';
-          e.currentTarget.style.color = 'var(--text-muted)';
-        }
-      }}
+      className={active ? 'tool is-active' : 'tool'}
+      aria-label={label}
+      title={label}
+      aria-pressed={active}
+      disabled={disabled}
+      onMouseDown={e => e.preventDefault()} // keep the editor selection
+      onClick={onClick}
     >
       {children}
     </button>
-  );
+  )
 }
 
-function Divider() {
+function LinkDialog({ open, initial, onApply, onRemove, onClose }) {
+  const [url, setUrl] = useState('')
+  const [error, setError] = useState(null)
+  useEffect(() => { if (open) { setUrl(initial || 'https://'); setError(null) } }, [open, initial])
+  const apply = event => {
+    event.preventDefault()
+    const value = url.trim()
+    if (!value || value === 'https://') return setError('Enter a web address.')
+    try { new URL(value.startsWith('/') ? `${window.location.origin}${value}` : value) } catch { return setError('That doesn’t look like a valid link.') }
+    onApply(value)
+  }
   return (
-    <span style={{
-      width: 1,
-      height: 18,
-      background: 'var(--border2)',
-      margin: '0 4px',
-      flexShrink: 0,
-    }} />
-  );
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={initial ? 'Edit link' : 'Add link'}
+      size="sm"
+      footer={
+        <>
+          {initial && <Button variant="ghost" onClick={onRemove}>Remove link</Button>}
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button type="submit" form="link-form">Apply</Button>
+        </>
+      }
+    >
+      <form id="link-form" onSubmit={apply}>
+        <Field label="Web address" error={error}>
+          <Input type="url" inputMode="url" value={url} onChange={e => { setUrl(e.target.value); setError(null) }} autoFocus />
+        </Field>
+      </form>
+    </Modal>
+  )
 }
 
-export default function PostEditor({ content = '', onChange }) {
-  const editor = useEditor({
-   extensions: [
-  StarterKit,
-  Link.configure({
-    openOnClick: false,
-    autolink: true,
-    defaultProtocol: 'https',
-  }),
-   Highlight.configure({
-    multicolor: true,
-  }),
-   TextStyle,
-  Color,
-],
-    content,
-    onUpdate({ editor }) {
-      onChange(editor.getHTML());
-    },
-    editorProps: {
-      attributes: {
-        style: [
-          'min-height: 340px',
-          'padding: 20px 24px',
-          'outline: none',
-          'font-family: Inter, sans-serif',
-          'font-size: 14px',
-          'line-height: 1.75',
-          'color: var(--text)',
-        ].join(';'),
-      },
-    },
-  });
+function ImageDialog({ open, onInsert, onClose, uploadImage }) {
+  const fileRef = useRef(null)
+  const [state, setState] = useState({ status: 'idle' }) // idle | uploading | ready | error
+  const [alt, setAlt] = useState('')
+  useEffect(() => { if (open) { setState({ status: 'idle' }); setAlt('') } }, [open])
 
-  useEffect(() => {
-    if (editor && content && editor.getHTML() !== content) {
-      editor.commands.setContent(content, false);
+  const choose = async event => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!file.type.startsWith('image/')) return setState({ status: 'error', error: 'Choose an image file (JPG, PNG, WebP, GIF).' })
+    if (file.size > MAX_IMAGE) return setState({ status: 'error', error: 'Images must be smaller than 5 MB.' })
+    setState({ status: 'uploading', preview: URL.createObjectURL(file) })
+    try {
+      const { url } = await uploadImage(file)
+      setState({ status: 'ready', url, preview: url })
+    } catch (error) {
+      setState({ status: 'error', error: error.message || 'Upload failed. Please try again.' })
     }
-  }, [content, editor]);
-
-  if (!editor) return null;
-
-  const setLink = () => {
-  const previousUrl = editor.getAttributes('link').href || '';
-  const url = window.prompt('Enter URL', previousUrl || 'https://');
-
-  if (url === null) return;
-
-  if (url.trim() === '') {
-    editor.chain().focus().extendMarkRange('link').unsetLink().run();
-    return;
   }
 
-  editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
-};
+  return (
+    <Modal
+      open={open}
+      onClose={() => state.status !== 'uploading' && onClose()}
+      dismissible={state.status !== 'uploading'}
+      title="Insert image"
+      description="Images are uploaded to the publication’s media storage."
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={state.status === 'uploading'}>Cancel</Button>
+          <Button disabled={state.status !== 'ready'} onClick={() => onInsert({ src: state.url, alt: alt.trim() })}>Insert image</Button>
+        </>
+      }
+    >
+      <input ref={fileRef} type="file" accept="image/*" hidden onChange={choose} />
+      <div className="image-picker">
+        {state.preview ? (
+          <div className="image-picker__preview">
+            <img src={state.preview} alt="" />
+            {state.status === 'uploading' && <span className="image-picker__busy"><Spinner label="Uploading image" /> Uploading…</span>}
+          </div>
+        ) : (
+          <button type="button" className="image-picker__drop" onClick={() => fileRef.current?.click()}>
+            <LuImage aria-hidden="true" />
+            <span><strong>Choose an image</strong><br />JPG, PNG, WebP or GIF · up to 5 MB</span>
+          </button>
+        )}
+        {state.status === 'error' && <Alert variant="danger">{state.error}</Alert>}
+        {(state.status === 'ready' || state.status === 'error') && (
+          <Button variant="ghost" size="sm" onClick={() => fileRef.current?.click()}>Choose a different image</Button>
+        )}
+      </div>
+      <Field label="Alt text" hint="Describe the image for readers using screen readers.">
+        <Input value={alt} onChange={e => setAlt(e.target.value)} placeholder="e.g. Request flow between client, API and database" />
+      </Field>
+    </Modal>
+  )
+}
 
-const removeLink = () => {
-  editor.chain().focus().extendMarkRange('link').unsetLink().run();
-};
+/**
+ * Article editor (Tiptap). Output stays HTML, as before — the API contract is
+ * unchanged. The writing canvas uses the same `.prose` typography readers see.
+ */
+export default function PostEditor({ content = '', onChange, uploadImage, invalid = false }) {
+  const [linkOpen, setLinkOpen] = useState(false)
+  const [imageOpen, setImageOpen] = useState(false)
 
-const toggleHighlight = () => {
-  editor.chain().focus().toggleHighlight({ color: 'rgba(0,229,255,0.20)' }).run();
-};
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: { levels: [1, 2, 3, 4] }, // h1 kept so older articles round-trip unchanged
+        link: { openOnClick: false, autolink: true, defaultProtocol: 'https' },
+      }),
+      Image.configure({ inline: false }),
+      Highlight.configure({ multicolor: true }),
+      TextStyle,
+      Color,
+      Placeholder.configure({ placeholder: 'Start writing… Use the toolbar or Markdown shortcuts like ## for a heading.' }),
+    ],
+    content,
+    onUpdate: ({ editor }) => onChange(editor.isEmpty ? '' : editor.getHTML()),
+    editorProps: {
+      attributes: {
+        class: 'prose prose--editor',
+        'aria-label': 'Article body',
+        'aria-multiline': 'true',
+        role: 'textbox',
+      },
+    },
+  })
 
-const setHighlightColor = color => {
-  editor.chain().focus().setHighlight({ color }).run();
-};
+  useEffect(() => {
+    if (editor && content && editor.getHTML() !== content && !editor.isFocused) {
+      editor.commands.setContent(content, { emitUpdate: false })
+    }
+  }, [content, editor])
 
-const removeHighlight = () => {
-  editor.chain().focus().unsetHighlight().run();
-};
+  const ui = useEditorState({
+    editor,
+    selector: ({ editor: e }) => (e ? {
+      block: e.isActive('heading', { level: 2 }) ? 'h2' : e.isActive('heading', { level: 3 }) ? 'h3'
+        : e.isActive('heading', { level: 4 }) ? 'h4' : e.isActive('heading', { level: 1 }) ? 'h1' : 'p',
+      bold: e.isActive('bold'), italic: e.isActive('italic'), strike: e.isActive('strike'), code: e.isActive('code'),
+      highlight: e.isActive('highlight'), bulletList: e.isActive('bulletList'), orderedList: e.isActive('orderedList'),
+      blockquote: e.isActive('blockquote'), codeBlock: e.isActive('codeBlock'), link: e.isActive('link'),
+      canUndo: e.can().undo(), canRedo: e.can().redo(),
+    } : null),
+  })
 
-const setTextColor = color => {
-  editor.chain().focus().setColor(color).run();
-};
+  if (!editor || !ui) return <div className="editor editor--loading"><Spinner label="Loading editor" /></div>
 
-const removeTextColor = () => {
-  editor.chain().focus().unsetColor().run();
-};
-
-  const btn = (action, active, title, label) => (
-    <ToolbarButton onClick={action} active={active} title={title}>
-      {label}
-    </ToolbarButton>
-  );
+  const chain = () => editor.chain().focus()
+  const setBlock = value => {
+    if (value === 'p') chain().setParagraph().run()
+    else chain().toggleHeading({ level: Number(value.slice(1)) }).run()
+  }
 
   return (
-    <div style={{
-      border: '1px solid var(--border)',
-      borderRadius: 6,
-      background: 'var(--surface)',
-      overflow: 'hidden',
-    }}>
-      {/* Toolbar */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 2,
-        padding: '8px 12px',
-        borderBottom: '1px solid var(--border)',
-        background: 'var(--surface2)',
-        flexWrap: 'wrap',
-      }}>
-        {btn(
-          () => editor.chain().focus().toggleBold().run(),
-          editor.isActive('bold'),
-          'Bold',
-          <strong>B</strong>
-        )}
-        {btn(
-          () => editor.chain().focus().toggleItalic().run(),
-          editor.isActive('italic'),
-          'Italic',
-          <em>I</em>
-        )}
+    <div className={invalid ? 'editor is-invalid' : 'editor'}>
+      <div className="editor__toolbar" role="toolbar" aria-label="Formatting">
+        <label className="ui-visually-hidden" htmlFor="block-style">Text style</label>
+        <select id="block-style" className="tool-select" value={ui.block} onChange={e => setBlock(e.target.value)}>
+          <option value="p">Paragraph</option>
+          <option value="h2">Heading</option>
+          <option value="h3">Subheading</option>
+          <option value="h4">Minor heading</option>
+          {ui.block === 'h1' && <option value="h1">Title heading (legacy)</option>}
+        </select>
 
-        <Divider />
+        <span className="tool-sep" aria-hidden="true" />
+        <ToolButton label="Bold" active={ui.bold} onClick={() => chain().toggleBold().run()}><LuBold /></ToolButton>
+        <ToolButton label="Italic" active={ui.italic} onClick={() => chain().toggleItalic().run()}><LuItalic /></ToolButton>
+        <ToolButton label="Strikethrough" active={ui.strike} onClick={() => chain().toggleStrike().run()}><LuStrikethrough /></ToolButton>
+        <ToolButton label="Inline code" active={ui.code} onClick={() => chain().toggleCode().run()}><LuCode /></ToolButton>
+        <ToolButton label="Highlight" active={ui.highlight} onClick={() => chain().toggleHighlight({ color: 'rgba(255, 115, 82, 0.28)' }).run()}><LuHighlighter /></ToolButton>
 
-        {btn(
-          () => editor.chain().focus().toggleHeading({ level: 1 }).run(),
-          editor.isActive('heading', { level: 1 }),
-          'Heading 1',
-          'H1'
-        )}
-        {btn(
-          () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
-          editor.isActive('heading', { level: 2 }),
-          'Heading 2',
-          'H2'
-        )}
-        {btn(
-          () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
-          editor.isActive('heading', { level: 3 }),
-          'Heading 3',
-          'H3'
-        )}
+        <span className="tool-sep" aria-hidden="true" />
+        <ToolButton label="Bulleted list" active={ui.bulletList} onClick={() => chain().toggleBulletList().run()}><LuList /></ToolButton>
+        <ToolButton label="Numbered list" active={ui.orderedList} onClick={() => chain().toggleOrderedList().run()}><LuListOrdered /></ToolButton>
+        <ToolButton label="Quote / callout" active={ui.blockquote} onClick={() => chain().toggleBlockquote().run()}><LuQuote /></ToolButton>
+        <ToolButton label="Code block" active={ui.codeBlock} onClick={() => chain().toggleCodeBlock().run()}><LuSquareCode /></ToolButton>
+        <ToolButton label="Section break" onClick={() => chain().setHorizontalRule().run()}><LuMinus /></ToolButton>
 
-        <Divider />
+        <span className="tool-sep" aria-hidden="true" />
+        <ToolButton label={ui.link ? 'Edit link' : 'Add link'} active={ui.link} onClick={() => setLinkOpen(true)}><LuLink /></ToolButton>
+        <ToolButton label="Insert image" onClick={() => setImageOpen(true)} disabled={!uploadImage}><LuImage /></ToolButton>
 
-       {btn(
-  () => editor.chain().focus().toggleBulletList().run(),
-  editor.isActive('bulletList'),
-  'Bullet List',
-  '• —'
-)}
-{btn(
-  () => editor.chain().focus().toggleOrderedList().run(),
-  editor.isActive('orderedList'),
-  'Numbered List',
-  '1.'
-)}
+        <span className="tool-sep" aria-hidden="true" />
+        <ToolButton label="Undo" disabled={!ui.canUndo} onClick={() => chain().undo().run()}><LuUndo2 /></ToolButton>
+        <ToolButton label="Redo" disabled={!ui.canRedo} onClick={() => chain().redo().run()}><LuRedo2 /></ToolButton>
 
-<Divider />
-
-{btn(
-  setLink,
-  editor.isActive('link'),
-  'Add Link',
-  <HiOutlineLink size={14} />
-)}
-{btn(
-  removeLink,
-  false,
-  'Remove Link',
-  <HiOutlineX size={14} />
-)}
-
-<Divider />
-
-
-{btn(
-  toggleHighlight,
-  editor.isActive('highlight'),
-  'Highlight',
-  <HiOutlineAnnotation size={14} />
-)}
-
-<div style={{ display: 'inline-flex', gap: 6, marginLeft: 4, alignItems: 'center' }}>
-  {[
-    'var(--accent)',
-    'rgba(57,255,138,0.28)',
-    'rgba(255,209,102,0.30)',
-    'rgba(255,68,102,0.22)',
-  ].map(color => (
-    <button
-      key={color}
-      type="button"
-      title="Highlight color"
-      onMouseDown={e => {
-        e.preventDefault();
-        setHighlightColor(color);
-      }}
-      style={{
-        width: 14,
-        height: 14,
-        borderRadius: '50%',
-        border: '1px solid var(--border2)',
-        background: color,
-        cursor: 'pointer',
-        padding: 0,
-      }}
-    />
-  ))}
-  <button
-    type="button"
-    title="Remove Highlight"
-    onMouseDown={e => {
-      e.preventDefault();
-      removeHighlight();
-    }}
-    style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      width: 24,
-      height: 24,
-      background: 'transparent',
-      border: '1px solid transparent',
-      color: 'var(--text-muted)',
-      borderRadius: 4,
-      cursor: 'pointer',
-    }}
-    onMouseEnter={e => {
-  e.currentTarget.style.background = 'var(--surface3)';
-  e.currentTarget.style.color = 'var(--text)';
-  e.currentTarget.style.borderColor = 'var(--border2)';
-}}
-onMouseLeave={e => {
-  e.currentTarget.style.background = 'transparent';
-  e.currentTarget.style.color = 'var(--text-muted)';
-  e.currentTarget.style.borderColor = 'transparent';
-}}
-  >
-    <HiOutlineX size={12} />
-  </button>
-</div>
-
-<Divider/>
-{btn(
-  () => {},
-  false,
-  'Text Color',
-  <HiOutlineColorSwatch size={14} />
-)}
-
-<div style={{ display: 'inline-flex', gap: 6, marginLeft: 4, alignItems: 'center' }}>
-  {[
-    'var(--accent)',
-    'var(--green)',
-    '#ffd166',
-    '#ff6b6b',
-  ].map(color => (
-    <button
-      key={color}
-      type="button"
-      title="Text color"
-      onMouseDown={e => {
-        e.preventDefault();
-        setTextColor(color);
-      }}
-      style={{
-        width: 14,
-        height: 14,
-        borderRadius: '50%',
-        border: '1px solid var(--border2)',
-        background: color,
-        cursor: 'pointer',
-        padding: 0,
-      }}
-    />
-  ))}
-
-  <button
-    type="button"
-    title="Remove Text Color"
-    onMouseDown={e => {
-      e.preventDefault();
-      removeTextColor();
-    }}
-    style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      width: 24,
-      height: 24,
-      background: 'transparent',
-      border: '1px solid transparent',
-      color: 'var(--text-muted)',
-      borderRadius: 4,
-      cursor: 'pointer',
-      
-    }}
-    onMouseEnter={e => {
-  e.currentTarget.style.background = 'var(--surface3)';
-  e.currentTarget.style.color = 'var(--text)';
-  e.currentTarget.style.borderColor = 'var(--border2)';
-}}
-onMouseLeave={e => {
-  e.currentTarget.style.background = 'transparent';
-  e.currentTarget.style.color = 'var(--text-muted)';
-  e.currentTarget.style.borderColor = 'transparent';
-}}
-  >
-    <HiOutlineX size={12} />
-  </button>
-</div>
-
-{btn(
-  () => editor.chain().focus().toggleCodeBlock().run(),
-  editor.isActive('codeBlock'),
-  'Code Block',
-  '</>'
-)}
+        <Menu
+          label="More formatting"
+          align="end"
+          className="tool-more"
+          trigger={<button type="button" className="tool" aria-label="More formatting" title="More formatting"><LuMoreHorizontal /></button>}
+        >
+          <MenuItem onSelect={() => chain().setColor('var(--color-accent)').run()}>Text colour: brand</MenuItem>
+          <MenuItem onSelect={() => chain().setColor('var(--color-accent-2)').run()}>Text colour: accent</MenuItem>
+          <MenuItem onSelect={() => chain().unsetColor().run()}>Remove text colour</MenuItem>
+          <MenuSeparator />
+          <MenuItem onSelect={() => chain().unsetHighlight().run()}>Remove highlight</MenuItem>
+          <MenuItem onSelect={() => chain().unsetAllMarks().clearNodes().run()}>Clear formatting</MenuItem>
+        </Menu>
       </div>
 
-      {/* Editor area */}
-      <style>{`
-        .tiptap-editor h1 { font-family: Orbitron, monospace; font-size: 22px; font-weight: 700; color: var(--text); margin: 20px 0 10px; }
-        .tiptap-editor h2 { font-family: Orbitron, monospace; font-size: 18px; font-weight: 700; color: var(--text); margin: 18px 0 8px; }
-        .tiptap-editor h3 { font-family: Orbitron, monospace; font-size: 15px; font-weight: 700; color: var(--text); margin: 16px 0 6px; }
-        .tiptap-editor p { margin: 0 0 10px; }
-        .tiptap-editor ul { padding-left: 20px; margin: 0 0 10px; list-style: disc; }
-        .tiptap-editor ol { padding-left: 20px; margin: 0 0 10px; list-style: decimal; }
-        .tiptap-editor li { margin-bottom: 4px; }
-        .tiptap-editor a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
-        .tiptap-editor pre { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 12px 16px; font-family: JetBrains Mono, monospace; font-size: 12px; color: var(--accent); overflow-x: auto; margin: 0 0 10px; }
-        .tiptap-editor code { font-family: JetBrains Mono, monospace; font-size: 12px; background: var(--surface2); padding: 1px 5px; border-radius: 3px; color: var(--accent); }
-        .tiptap-editor p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: var(--text-faint); pointer-events: none; float: left; height: 0; font-family: Inter, sans-serif; }
-        .tiptap-editor mark {
-  padding: 2px 4px;
-  border-radius: 3px;
-  color: inherit;
-}
-  .tiptap-editor span[style*="color"] {
-  transition: color 0.15s ease;
-}
-  
-      `}</style>
+      <EditorContent editor={editor} className="editor__canvas" />
 
-      <div className="tiptap-editor">
-        <EditorContent editor={editor} />
-      </div>
+      <LinkDialog
+        open={linkOpen}
+        initial={editor.getAttributes('link').href}
+        onClose={() => setLinkOpen(false)}
+        onRemove={() => { chain().extendMarkRange('link').unsetLink().run(); setLinkOpen(false) }}
+        onApply={href => { chain().extendMarkRange('link').setLink({ href }).run(); setLinkOpen(false) }}
+      />
+      <ImageDialog
+        open={imageOpen}
+        uploadImage={uploadImage}
+        onClose={() => setImageOpen(false)}
+        onInsert={attrs => { chain().setImage(attrs).run(); setImageOpen(false) }}
+      />
     </div>
-  );
+  )
 }

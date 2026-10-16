@@ -2,6 +2,8 @@ import User from "../models/user.model.js";
 import { errorHandler } from "../utils/error.js";
 import bcryptjs from 'bcryptjs';
 import cloudinary from '../config/cloudinary.js';
+import mongoose from 'mongoose';
+import Post from '../models/post.model.js';
 
 export const test = (req, res) => {
   res.json({ message: 'API is working' });
@@ -18,7 +20,7 @@ export const updateUser = async (req, res, next) => {
     req.body.password = bcryptjs.hashSync(req.body.password, 10);
   }
   if (req.body.username) {
-    if (req.body.username.length < 7 || req.body.username > 20) {
+    if (req.body.username.length < 7 || req.body.username.length > 20) {
       return next(errorHandler(400, "Username must between 7 and 20 characters only"));
     }
     if (req.body.username.includes(' ')) {
@@ -30,20 +32,28 @@ export const updateUser = async (req, res, next) => {
     if (!req.body.username.match(/^[a-zA-Z0-9]+$/)) {
       return next(errorHandler(400, 'Username can only contain letters and numbers'));
     }
-    try {
-      const updatedUser = await User.findByIdAndUpdate(req.params.userId, {
-        $set: {
-          username: req.body.username,
-          email: req.body.email,
-          password: req.body.password,
-        }
-      }, { new: true });
+  }
 
-      const { password, ...rest } = updatedUser._doc;
-      res.status(200).json(rest);
-    } catch (error) {
-      next(error);
+  // Only set the fields that were actually sent, so an email- or password-only
+  // update never touches the username (and always gets a response).
+  const updates = {};
+  if (req.body.username) updates.username = req.body.username;
+  if (req.body.email) updates.email = req.body.email;
+  if (req.body.password) updates.password = req.body.password;
+
+  try {
+    const updatedUser = await User.findByIdAndUpdate(req.params.userId, {
+      $set: updates,
+    }, { new: true });
+
+    if (!updatedUser) {
+      return next(errorHandler(404, 'User not found'));
     }
+
+    const { password, ...rest } = updatedUser._doc;
+    res.status(200).json(rest);
+  } catch (error) {
+    next(error);
   }
 };
 
@@ -126,7 +136,7 @@ export const getusers = async (req, res, next) => {
 
     const users = await User.find()
       .sort({ createdAt: sortDirection })
-      .skip({ startIndex })
+      .skip(startIndex)
       .limit(limit);
 
     const usersWitoutpassword = users.map((user) => {
@@ -139,8 +149,8 @@ export const getusers = async (req, res, next) => {
     const now = new Date();
     const oneMonthago = new Date(
       now.getFullYear(),
+      now.getMonth() - 1,
       now.getDate(),
-      now.getMonth(),
     );
 
     const lastMonthusers = await User.countDocuments({
@@ -165,6 +175,45 @@ export const getUser = async (req, res, next) => {
     }
     const { password, ...rest } = user._doc;
     res.status(200).json(rest);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ── Save for later ──────────────────────────────────────────────
+export const getSavedPosts = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id).select('savedPosts');
+    if (!user) return next(errorHandler(404, 'User not found'));
+    const ids = (user.savedPosts || []).filter(id => mongoose.Types.ObjectId.isValid(id));
+    const posts = await Post.find({ _id: { $in: ids } });
+    // newest saved first; posts deleted since saving simply drop out
+    const order = new Map(ids.map((id, i) => [id, i]));
+    posts.sort((a, b) => order.get(b._id.toString()) - order.get(a._id.toString()));
+    res.status(200).json({ posts });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const toggleSavedPost = async (req, res, next) => {
+  const { postId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(postId)) {
+    return next(errorHandler(400, 'Invalid post'));
+  }
+  try {
+    const user = await User.findById(req.user.id).select('savedPosts');
+    if (!user) return next(errorHandler(404, 'User not found'));
+    const alreadySaved = user.savedPosts.includes(postId);
+    if (!alreadySaved && !(await Post.exists({ _id: postId }))) {
+      return next(errorHandler(404, 'Post not found'));
+    }
+    const updated = await User.findByIdAndUpdate(
+      req.user.id,
+      alreadySaved ? { $pull: { savedPosts: postId } } : { $addToSet: { savedPosts: postId } },
+      { new: true }
+    ).select('savedPosts');
+    res.status(200).json({ saved: !alreadySaved, savedPosts: updated.savedPosts });
   } catch (error) {
     next(error);
   }

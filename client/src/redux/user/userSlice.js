@@ -55,6 +55,10 @@ const userSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
     },
+    // Save for later: keep the persisted user's saved ids in sync.
+    setSavedPosts: (state, action) => {
+        if (state.currentUser) state.currentUser.savedPosts = action.payload;
+    },
     siginOutSuccess: (state) =>{
         state.currentUser = null;
         state.loading = false;
@@ -67,7 +71,7 @@ const userSlice = createSlice({
 export const{signInStart,siginInSuccess,signInFailure,
     updateStart,updateSuccess,updateFailure,
     deleteUserStart,deleteUserSuccess,deleteUserFailure,
-    siginOutSuccess
+    siginOutSuccess, setSavedPosts
 } = userSlice.actions;
 
 export default userSlice.reducer;
